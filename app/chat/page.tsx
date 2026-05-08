@@ -129,7 +129,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: '#0A0A0F' }}>
-      {/* ── Header ─────────────────────────────────────────────── */}
+      {/* Header */}
       <header
         className="flex-shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 border-b"
         style={{ background: '#0B0B14', borderColor: '#181828' }}
@@ -180,7 +180,7 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* ── Messages ───────────────────────────────────────────── */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.map((msg, i) => (
@@ -264,7 +264,7 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* ── Input bar ──────────────────────────────────────────── */}
+      {/* Input bar */}
       <div
         className="flex-shrink-0 border-t px-4 py-3"
         style={{ background: '#0B0B14', borderColor: '#181828' }}
