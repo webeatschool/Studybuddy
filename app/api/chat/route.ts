@@ -33,10 +33,6 @@ export async function POST(req: NextRequest) {
       ? `\n\nThe student is studying: ${topic}\n\nStudy material provided:\n${studyNotes}`
       : `\n\nThe student is studying: ${topic}`;
 
-    // The stable portion (persona + topic + notes) is the same for every turn of
-    // a session, so we mark it for caching. The opening suffix only appears on the
-    // first request and gets its own (one-off) cache entry, which is fine.
-    // Caching pays off most when study notes are long (reduces token cost ~90%).
     const stableText = base + topicContext;
     const systemPrompt = isOpening ? stableText + OPENING_SUFFIX : stableText;
 
@@ -48,9 +44,6 @@ export async function POST(req: NextRequest) {
       },
     ];
 
-    // Anthropic requires conversations to start with role "user".
-    // The opening AI message is stored in frontend state as "assistant", so we
-    // must always prepend the hidden [START] trigger to keep the array valid.
     let apiMessages: { role: string; content: string }[];
     if (isOpening) {
       apiMessages = [{ role: 'user', content: '[START]' }];
