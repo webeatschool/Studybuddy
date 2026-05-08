@@ -155,6 +155,7 @@ export default function SetupPage() {
           showing that teaching others is the fastest path to mastery.
         </p>
 
+        {/* Stats row */}
         <div className="flex flex-wrap justify-center gap-4 mb-12">
           {STATS.map((s) => (
             <div
@@ -237,6 +238,7 @@ export default function SetupPage() {
           })}
         </div>
 
+        {/* Callout */}
         <div
           className="rounded-2xl p-6 flex flex-col sm:flex-row items-start gap-4"
           style={{
