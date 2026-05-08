@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { BookOpen, ArrowRight, Brain, Users, TrendingUp, Star, ChevronRight, FlaskConical, History, LogOut, LogIn, Flame, Clock, MessageSquare, FileText, Mic, AlignLeft, Upload, X, CircleCheck as CheckCircle, Loader as Loader2, CircleAlert as AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth';
-import { Bolt Database } from '@/lib/supabase';
+import { BoltDatabase } from '@/lib/supabase';
 import { AuthModal } from '@/components/AuthModal';
 
 const PERSONAS = [
@@ -205,7 +205,7 @@ export default function SetupPage() {
   useEffect(() => {
     if (!user) { setUserStats(null); return; }
     (async () => {
-      const { data } = await Bolt Database
+      const { data } = await BoltDatabase
         .from('study_sessions')
         .select('started_at, duration_seconds, message_count')
         .not('ended_at', 'is', null)
