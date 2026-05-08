@@ -1,27 +1,13 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import Providers from '@/components/Providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Study Buddy — AI Peer Learning',
-  description: 'AI-powered peer studying built on decades of research. Not a tutor, a partner.',
-  openGraph: {
-    images: [
-      {
-        url: 'https://bolt.new/static/og_default.png',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    images: [
-      {
-        url: 'https://bolt.new/static/og_default.png',
-      },
-    ],
-  },
+  title: 'Study Buddy — AI-Powered Peer Learning',
+  description: 'Study smarter with an AI peer partner. Built on decades of research showing that teaching others is the fastest path to mastery.',
 };
 
 export default function RootLayout({
@@ -31,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
