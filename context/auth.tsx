@@ -1,8 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import type { User, Session } from '@supabase/Bolt Database-js';
-import { Bolt Database } from '@/lib/supabase';
+import type { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
 interface AuthContextValue {
   user: User | null;
