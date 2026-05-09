@@ -6,13 +6,22 @@ const MAX_CHARS = 50000; // Cap output at 50KB characters
 
 async function extractTextFromPDF(file: File): Promise<string> {
   try {
-    const { getDocument } = await import('pdfjs-dist');
+    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf');
+    
+    // Set up worker
+    const pdfjsWorker = await import('pdfjs-dist/legacy/build/pdf.worker');
+    if (typeof window === 'undefined') {
+      // We're in Node/server context
+      const pdfWorker = require('pdfjs-dist/legacy/build/pdf.worker');
+      // @ts-ignore
+      getDocument.workerSrc = pdfWorker;
+    }
     
     const buffer = await file.arrayBuffer();
-    const pdf = await getDocument({ data: buffer }).promise;
+    const pdf = await getDocument({ data: new Uint8Array(buffer) }).promise;
     const pageCount = Math.min(pdf.numPages, MAX_PDF_PAGES);
     
-    const textExtraction = [];
+    const textExtraction: string[] = [];
     
     // Extract pages in parallel (up to 5 at a time)
     const batchSize = 5;
@@ -20,20 +29,30 @@ async function extractTextFromPDF(file: File): Promise<string> {
       const batchPromises = [];
       for (let j = i; j < Math.min(i + batchSize, pageCount); j++) {
         batchPromises.push(
-          pdf.getPage(j + 1).then(page => page.getTextContent()).catch(() => ({ items: [] }))
+          (async () => {
+            try {
+              const page = await pdf.getPage(j + 1);
+              const textContent = await page.getTextContent();
+              const pageText = (textContent.items as any[])
+                .map((item: any) => item.str || '')
+                .join('');
+              return pageText;
+            } catch (e) {
+              return ''; // Skip pages that fail
+            }
+          })()
         );
       }
       
       const results = await Promise.all(batchPromises);
-      for (const content of results) {
-        const pageText = (content.items as any[])
-          .map((item: any) => item.str || '')
-          .join('');
-        textExtraction.push(pageText);
-      }
+      textExtraction.push(...results);
     }
     
-    let fullText = textExtraction.join('\n');
+    let fullText = textExtraction.join('\n').trim();
+    
+    if (!fullText) {
+      throw new Error('No readable text found in PDF');
+    }
     
     // Truncate if necessary
     if (fullText.length > MAX_CHARS) {
@@ -42,6 +61,7 @@ async function extractTextFromPDF(file: File): Promise<string> {
     
     return fullText;
   } catch (error) {
+    console.error('PDF extraction error:', error);
     throw new Error(`PDF extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -53,13 +73,20 @@ async function extractTextFromDocx(file: File): Promise<string> {
     const buffer = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer: buffer });
     
-    let text = result.value;
+    let text = result.value || '';
+    text = text.trim();
+    
+    if (!text) {
+      throw new Error('No readable text found in DOCX');
+    }
+    
     if (text.length > MAX_CHARS) {
       text = text.slice(0, MAX_CHARS) + '\n\n[Content truncated due to size...]';
     }
     
     return text;
   } catch (error) {
+    console.error('DOCX extraction error:', error);
     throw new Error(`DOCX extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -83,12 +110,23 @@ export async function POST(req: NextRequest) {
     }
     
     const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const fileSize = file.size;
     
     // Validate file type
-    if (!['pdf', 'docx', 'doc'].includes(ext)) {
+    if (!['pdf', 'docx', 'doc', 'txt', 'md', 'rtf'].includes(ext)) {
       return new Response(
-        JSON.stringify({ error: `Unsupported file type: ${ext}` }),
+        JSON.stringify({ error: `Unsupported file type: .${ext}` }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate file size (max 20MB)
+    if (fileSize > 20 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ 
+          error: `File is too large (${(fileSize / 1024 / 1024).toFixed(2)}MB). Maximum size is 20MB.` 
+        }),
+        { status: 413, headers: { 'Content-Type': 'application/json' } }
       );
     }
     
@@ -100,7 +138,10 @@ export async function POST(req: NextRequest) {
     let text = '';
     
     try {
-      if (ext === 'pdf') {
+      if (ext === 'txt' || ext === 'md' || ext === 'rtf') {
+        // Simple text file
+        text = await Promise.race([file.text(), timeoutPromise]);
+      } else if (ext === 'pdf') {
         text = await Promise.race([extractTextFromPDF(file), timeoutPromise]);
       } else if (ext === 'docx') {
         text = await Promise.race([extractTextFromDocx(file), timeoutPromise]);
@@ -110,16 +151,17 @@ export async function POST(req: NextRequest) {
     } catch (timeoutError) {
       if (timeoutError instanceof Error && timeoutError.message === 'Extraction timeout') {
         return new Response(
-          JSON.stringify({ error: 'Document extraction took too long. Please try a smaller file.' }),
+          JSON.stringify({ error: 'Document extraction took too long (>10 seconds). Please try a smaller file or simpler format.' }),
           { status: 408, headers: { 'Content-Type': 'application/json' } }
         );
       }
       throw timeoutError;
     }
     
-    if (!text || text.trim().length === 0) {
+    text = text.trim();
+    if (!text || text.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'No text could be extracted from the document' }),
+        JSON.stringify({ error: 'No extractable text found in document. The file may be encrypted or contain only images.' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -130,7 +172,9 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error';
-    const status = message.includes('Unsupported') ? 400 : 500;
+    const status = message.includes('Unsupported') || message.includes('too large') ? 400 : 500;
+    
+    console.error('Extract text error:', message);
     
     return new Response(
       JSON.stringify({ error: message }),
